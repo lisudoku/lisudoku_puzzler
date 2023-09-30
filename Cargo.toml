@@ -1,0 +1,13 @@
+[package]
+name = "lisudoku_puzzler"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.93"
+lisudoku-solver = "0.1.21"
+# lisudoku-solver = { path = "../lisudoku_solver" }
+itertools = "0.10.5"
