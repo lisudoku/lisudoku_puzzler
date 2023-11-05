@@ -75,9 +75,9 @@ dependencies = [
 
 [[package]]
 name = "lisudoku-solver"
-version = "0.1.21"
+version = "0.1.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c9e4e21f80de6865334a0201586dabeb58fc4e112808ec46658a170a00ee792"
+checksum = "037ca6459e8c161a541119c837f6a7f801c1bc0d5653fa88451a977513a3885a"
 dependencies = [
  "combinations",
  "console_error_panic_hook",

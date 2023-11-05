@@ -2,20 +2,21 @@
   Input:
     - puzzle constraints? (just classic 9x9 for now?)
     - grid
-    - technique (naked_single, hidden_single etc.)
+    - technique (HiddenSingle, NakedSingle etc.)
     - user_solution_steps (could be optional and if not passed generate our own)
   Output: list of (grid, [cell position + value that would apply the technique])
 */
 use std::{env, rc::Rc};
 use itertools::Itertools;
 use serde::Deserialize;
-use lisudoku_solver::{types::{CellPosition, Grid, FixedNumber, SudokuConstraints, SolutionType, SudokuGrid}, solver::{Solver, logical_solver::technique::Technique}};
+use lisudoku_solver::{types::{CellPosition, Grid, FixedNumber, SudokuConstraints, SolutionType, SudokuGrid, Rule}, solver::{Solver, logical_solver::technique::Technique}};
 
 #[derive(Debug, Deserialize)]
 struct UserSolutionStep {
     r#type: String,
     value: Option<u32>,
-    cells: Vec<CellPosition>,
+    cells: Option<Vec<CellPosition>>,
+    cell: Option<CellPosition>, // old format
     #[allow(dead_code)]
     time: u32,
 }
@@ -40,36 +41,46 @@ fn main() {
 fn run(initial_grid_str: &String, technique_str: &String, user_solution_steps_str: &String) -> Vec<ResultItem> {
   let mut grid = SudokuGrid::from_string(initial_grid_str.clone()).values;
 
-  let technique = Solver::default_techniques()
+  let techniques: Vec<_> = Solver::default_techniques()
     .into_iter()
-    .find(|technique| technique.get_rule().to_string() == technique_str.clone())
-    .expect("Invalid technique passed");
+    .filter(|technique| {
+      if technique_str == "singles" {
+        return [Rule::NakedSingle, Rule::HiddenSingle].contains(&technique.get_rule())
+      }
+      technique.get_rule().to_string() == technique_str.clone()
+    })
+    .collect();
+
+  assert!(!techniques.is_empty(), "Invalid technique passed");
 
   let user_solution_steps: Vec<UserSolutionStep> = serde_json::from_str(&user_solution_steps_str).expect("JSON was not well-formatted");
 
   let mut result = vec![];
 
   // Also run for the initial grid
-  find_grid_steps(grid.to_vec(), technique.clone(), &mut result);
+  find_grid_steps(grid.to_vec(), &techniques, &mut result);
 
-  for step in user_solution_steps {
+  for mut step in user_solution_steps {
+    if step.cells.is_none() {
+      step.cells = Some(vec![step.cell.unwrap()]);
+    }
     match step.r#type.as_str() {
       "digit" => {
-        for cell in step.cells {
-          assert_eq!(grid[cell.row][cell.col], 0);
-          grid[cell.row][cell.col] = step.value.unwrap();
+        for cell in step.cells.unwrap() {
+          // Note: cell's value might not be 0 and we are overwriting the value
+          grid[cell.row][cell.col] = step.value.unwrap_or_default();
         }
       },
       "delete" => {
-        for cell in step.cells {
-          assert_ne!(grid[cell.row][cell.col], 0);
+        for cell in step.cells.unwrap() {
+          // Note: cell's value might be 0 already because we are deleting notes at this step
           grid[cell.row][cell.col] = 0;
         }
       },
       _ => { continue },
     };
 
-    find_grid_steps(grid.to_vec(), technique.clone(), &mut result);
+    find_grid_steps(grid.to_vec(), &techniques, &mut result);
   }
 
   result.into_iter()
@@ -77,12 +88,12 @@ fn run(initial_grid_str: &String, technique_str: &String, user_solution_steps_st
     .collect()
 }
 
-fn find_grid_steps(grid: Grid, technique: Rc<dyn Technique>, result: &mut Vec<(String, Vec<FixedNumber>)>) {
-  let min_empty_cell_count = grid.len() * grid.len() / 4;
+fn find_grid_steps(grid: Grid, techniques: &Vec<Rc<dyn Technique>>, result: &mut Vec<(String, Vec<FixedNumber>)>) {
+  let min_empty_cell_count = grid.len() * grid.len() * 2 / 5;
   if count_empty_cells(&grid) < min_empty_cell_count {
     return
   }
-  let solver_steps = run_solver(grid.to_vec(), technique.clone());
+  let solver_steps = run_solver(grid.to_vec(), techniques.clone());
   if solver_steps.is_empty() {
     return
   }
@@ -94,12 +105,12 @@ fn count_empty_cells(grid: &Grid) -> usize {
   grid.iter().map(|row| row.iter().filter(|&&cell| cell == 0).count()).sum()
 }
 
-fn run_solver(grid: Grid, technique: Rc<dyn Technique>) -> Vec<FixedNumber> {
+fn run_solver(grid: Grid, techniques: Vec<Rc<dyn Technique>>) -> Vec<FixedNumber> {
   let grid_size = grid.len();
   let fixed_numbers = SudokuGrid::new(grid).to_fixed_numbers();
   let mut solver = Solver::new(SudokuConstraints::new(grid_size, fixed_numbers), None)
     .with_single_step_mode()
-    .with_techniques(vec![ technique ]);
+    .with_techniques(techniques);
   let res = solver.logical_solve();
   if res.solution_type == SolutionType::None {
     return vec![]

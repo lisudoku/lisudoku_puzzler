@@ -2,7 +2,7 @@
 
 Used by https://lisudoku.xyz to generate training puzzles.
 
-Currently it only works with classic 9x9 sudokus and 2 techniques (hidden singles, naked singles).
+Currently it only works with classic 9x9 sudokus and 2 techniques (HiddenSingle, NakedSingle).
 
 Usage
 ```
