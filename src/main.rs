@@ -109,7 +109,7 @@ fn run_solver(grid: Grid, techniques: Vec<Rc<dyn Technique>>) -> Vec<FixedNumber
   let grid_size = grid.len();
   let fixed_numbers = SudokuGrid::new(grid).to_fixed_numbers();
   let mut solver = Solver::new(SudokuConstraints::new(grid_size, fixed_numbers), None)
-    .with_single_step_mode()
+    .with_step_count_limit(1)
     .with_techniques(techniques);
   let res = solver.logical_solve();
   if res.solution_type == SolutionType::None {
